@@ -1,0 +1,99 @@
+#!/usr/bin/env python
+
+import shlex
+import subprocess
+import argparse
+
+
+# Dictionary for parse SS output
+STATE = {
+    'ESTAB':      0,
+    'SYN-SENT':   1,
+    'SYN-RECV':   2,
+    'FIN-WAIT-1': 3,
+    'FIN-WAIT-2': 4,
+    'TIME-WAIT':  5,
+    'UNCONN':     6,
+    'CLOSE-WAIT': 7,
+    'LAST-ACK':   8,
+    'LISTEN':     9,
+    'CLOSING':    10
+}
+
+# List of counters for different TCP states
+count_conn = []
+count_conn.append([0,"ESTABLISHED"])
+count_conn.append([0,"SYN-SENT"])
+count_conn.append([0,"SYN-RECV"])
+count_conn.append([0,"FIN-WAIT-1"])
+count_conn.append([0,"FIN-WAIT-2"])
+count_conn.append([0,"TIME-WAIT"])
+count_conn.append([0,"CLOSE"])
+count_conn.append([0,"CLOSE-WAIT"])
+count_conn.append([0,"LAST-ACK"])
+count_conn.append([0,"LISTEN"])
+count_conn.append([0,"CLOSING"])
+
+count_all = 0
+
+# Parser for input args
+def createParser ():
+    parser = argparse.ArgumentParser()
+    parser.add_argument ('-j', '--json', action='store_const', const=True, default=False, 
+                         help='Enable print results in JSON format')
+    parser.add_argument ('-s', '--src', default='',
+                         help='Use specific source address (IP or IP:port)')
+    parser.add_argument ('-d', '--dst', default='',
+                         help='Use specific destination address (IP or IP:port)')    
+    return parser
+
+# Return result in human-readable view
+def print_default():
+    print ('%5d %s' % (count_all, "ALL"))        
+    for num in count_conn:
+        print ('%5d %s' % (num[0], num[1]))
+
+# Return results in JSON-view
+def print_json():
+    json_ret = "<prtg><result><channel>ALL</channel><value>"
+    json_ret += str(count_all)
+    json_ret += "</value></result>"
+    for state in count_conn:
+        json_ret += "<result><channel>" + state[1] + "</channel>"
+        json_ret += "<value>" + str(state[0]) + "</value></result>"
+    json_ret += "</prtg>"
+    print json_ret
+    
+    
+###________ MAIN ________###
+if __name__ == '__main__':
+    
+    parser = createParser()
+    arg = parser.parse_args()
+
+    # Check for SS parameters from command line
+    ss_cmd = "ss -tn state connected"
+    if arg.src:
+        ss_cmd += " src " + arg.src
+    if arg.dst:
+        ss_cmd += " dst " + arg.dst
+        
+    # Run SS utility to collect data about TCP-connctions
+    ss_raw = subprocess.Popen(shlex.split(ss_cmd), stdout=subprocess.PIPE)
+    
+    # Collect only TCP state of connection
+    raw_data = []
+    for line in ss_raw.stdout.readlines():
+        raw_data.append(line.rstrip().split()[0])
+
+    # Count TCP states by types
+    for conn in raw_data:
+        if conn in STATE:
+            count_conn[STATE[conn]][0] += 1
+            count_all += 1
+            
+    # Return result
+    if arg.json:
+        print_json()
+    else:
+        print_default()
