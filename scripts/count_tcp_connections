@@ -62,7 +62,7 @@ def print_json():
         json_ret += "<result><channel>" + state[1] + "</channel>"
         json_ret += "<value>" + str(state[0]) + "</value></result>"
     json_ret += "</prtg>"
-    print json_ret
+    print (json_ret)
     
     
 ###________ MAIN ________###
